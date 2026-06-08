@@ -1,0 +1,16 @@
+# Maven build output
+target/
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# JMeter results
+*.jtl

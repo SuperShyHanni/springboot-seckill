@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>秒杀 Demo</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f5f6fa; color: #2c2c2c; margin: 0; padding: 24px;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .sub { color: #888; font-size: 13px; margin-bottom: 20px; }
+    .bar {
+      background: #fff; border-radius: 10px; padding: 14px 16px; margin-bottom: 18px;
+      display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .bar label { font-size: 14px; color: #555; }
+    .bar input {
+      width: 90px; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;
+    }
+    .bar button {
+      margin-left: auto; padding: 7px 14px; border: 1px solid #ddd; background: #fff;
+      border-radius: 6px; cursor: pointer; font-size: 13px;
+    }
+    .bar button:hover { background: #f0f0f0; }
+    .card {
+      background: #fff; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06); display: flex; align-items: center; gap: 16px;
+    }
+    .card .info { flex: 1; }
+    .card .name { font-size: 16px; font-weight: 600; }
+    .card .meta { font-size: 13px; color: #888; margin-top: 3px; }
+    .card .stock { color: #e0564b; font-weight: 600; }
+    .btns { display: flex; gap: 8px; }
+    .btns button {
+      padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer;
+      font-size: 13px; color: #fff;
+    }
+    .btn-sync { background: #6b7280; }
+    .btn-sync:hover { background: #565d68; }
+    .btn-async { background: #e0564b; }
+    .btn-async:hover { background: #c9453b; }
+    #log {
+      background: #1e1e2e; color: #cdd6f4; border-radius: 10px; padding: 14px 16px;
+      font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 1.7;
+      margin-top: 18px; max-height: 240px; overflow-y: auto; white-space: pre-wrap;
+    }
+    #log .ok { color: #a6e3a1; }
+    #log .no { color: #f38ba8; }
+    #log .q  { color: #f9e2af; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🛒 秒杀 Demo</h1>
+    <div class="sub">同步下单 /seckill/do · 异步下单 /seckill/async · 演示用</div>
+
+    <div class="bar">
+      <label>用户ID</label>
+      <input id="userId" type="number" value="1" />
+      <button onclick="loadGoods()">🔄 刷新商品/库存</button>
+    </div>
+
+    <div id="goods"></div>
+
+    <div id="log">就绪。点击「同步抢购」或「异步抢购」试试。</div>
+  </div>
+
+  <script>
+    const logEl = document.getElementById('goods');
+    const out = document.getElementById('log');
+
+    function log(msg, cls) {
+      const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      const span = cls ? `<span class="${cls}">${msg}</span>` : msg;
+      out.innerHTML = `[${time}] ${span}\n` + out.innerHTML;
+    }
+
+    async function loadGoods() {
+      try {
+        const res = await fetch('/goods/list');
+        const list = await res.json();
+        logEl.innerHTML = list.map(g => `
+          <div class="card">
+            <div class="info">
+              <div class="name">${g.goodsName}</div>
+              <div class="meta">¥${g.goodsPrice} · 库存 <span class="stock">${g.stockCount}</span></div>
+            </div>
+            <div class="btns">
+              <button class="btn-sync" onclick="seckill(${g.id}, 'do')">同步抢购</button>
+              <button class="btn-async" onclick="seckill(${g.id}, 'async')">异步抢购</button>
+            </div>
+          </div>`).join('');
+      } catch (e) {
+        log('加载商品失败，确认应用已启动 (localhost:8080)', 'no');
+      }
+    }
+
+    async function seckill(goodsId, mode) {
+      const userId = document.getElementById('userId').value;
+      try {
+        const res = await fetch('/seckill/' + mode, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `userId=${userId}&goodsId=${goodsId}`
+        });
+        const text = await res.text();
+        let cls = 'q';
+        if (text.includes('成功')) cls = 'ok';
+        else if (text.includes('抢完') || text.includes('错误')) cls = 'no';
+        const tag = mode === 'do' ? '[同步]' : '[异步]';
+        log(`${tag} 商品${goodsId} → ${text}`, cls);
+        // 异步是后台落库，稍等再刷新才能看到库存变化
+        setTimeout(loadGoods, mode === 'async' ? 600 : 0);
+      } catch (e) {
+        log('请求失败：' + e.message, 'no');
+      }
+    }
+
+    loadGoods();
+  </script>
+</body>
+</html>
